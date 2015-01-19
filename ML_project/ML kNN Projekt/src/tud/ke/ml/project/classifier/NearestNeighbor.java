@@ -11,9 +11,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.Vector;
 
 import tud.ke.ml.project.framework.classifier.ANearestNeighbor;
 import tud.ke.ml.project.util.Pair;
+import weka.classifiers.bayes.net.search.fixed.FromFile;
 
 /**
  * This implementation assumes the class attribute is always available (but
@@ -27,7 +29,7 @@ public class NearestNeighbor extends ANearestNeighbor {
 	protected double[] scaling;
 	protected double[] translation;
 	private List<List<Object>> traindata;
-	private Map<Object, List<List<Pair<Object, Double>>>> vdm = new HashMap<Object, List<List<Pair<Object, Double>>>>();
+	private Map<Object, List<Map<Object, Double>>> vdm = new HashMap<Object, List<Map<Object, Double>>>();
 
 	@Override
 	protected Object vote(List<Pair<List<Object>, Double>> subset) {
@@ -47,18 +49,7 @@ public class NearestNeighbor extends ANearestNeighbor {
 			List<Pair<List<Object>, Double>> subset) {
 
 		return weightedVotesFun(subset, 0);
-		// Map<Object, Double> map = new HashMap<Object, Double>();
-		// for (int i = 0; i < subset.size(); i++) {
-		// String classAtt = (String) subset.get(i).getA()
-		// .get(subset.get(i).getA().size() - 1);
-		// if (map.containsKey(classAtt))
-		// map.put(classAtt, map.get(classAtt) + subset.get(i).getB());
-		// else
-		// map.put(classAtt, subset.get(i).getB());
-		//
-		// }
-		//
-		// return map;
+
 	}
 
 	@Override
@@ -129,7 +120,11 @@ public class NearestNeighbor extends ANearestNeighbor {
 	@Override
 	protected List<Pair<List<Object>, Double>> getNearest(List<Object> testdata) {
 		List<Pair<List<Object>, Double>> pairs = new ArrayList<Pair<List<Object>, Double>>();
-		// VDM(traindata);
+
+		double[][] scalTran = normalizationScaling();
+		this.scaling = scalTran[1];
+		this.translation = scalTran[0];
+
 		for (int i = 0; i < traindata.size(); i++)
 			pairs.add(new Pair<List<Object>, Double>(traindata.get(i),
 					getMetric() == 0 ? determineManhattanDistance(
@@ -159,12 +154,39 @@ public class NearestNeighbor extends ANearestNeighbor {
 		return result;
 	}
 
-	private void VDM(List<List<Object>> traindata2) {
-		List<List<Map<Object, Double>>> vdmMatrix = new LinkedList<List<Map<Object, Double>>>();
-		for (int i = 0; i < traindata2.get(0).size(); i++) {
-			vdmMatrix.add(new LinkedList<Map<Object, Double>>());
+	private double[] calDifVDM_N(Object o1, Object o2, int attrIndex) {
+		double[] n = { 0, 0 };
+		HashMap<Object, Double> w;
+		for (Object o : vdm.keySet()) {
+			w = (HashMap<Object, Double>) this.vdm.get(o).get(attrIndex);
+
+			n[0] += w.containsKey(o1) ? w.get(o1) : 0;
+			n[1] += w.containsKey(o2) ? w.get(o2) : 0;
 		}
-		for (List<Object> list : traindata2) {
+		return n;
+	}
+
+	private double vdmFunc(Object o1, Object o2, int attrIndex) {
+		double[] n = calDifVDM_N(o1, o2, attrIndex);
+		double sum = 0;
+		HashMap<Object, Double> w;
+		for (Object o : vdm.keySet()) {
+			w = (HashMap<Object, Double>) this.vdm.get(o).get(attrIndex);
+			sum += Math.pow(
+					Math.abs(((w.containsKey(o1) ? w.get(o1) : 0) / n[0])
+							- ((w.containsKey(o2) ? w.get(o2) : 0) / n[1])),
+					getkNearest());
+		}
+		return sum;
+	}
+
+	private void VDM() {
+
+		for (List<Object> list : traindata) {
+			Object o = list.get(list.size() - 1);
+			checkClass(o);
+			List<Map<Object, Double>> vdmMatrix = this.vdm.get(o);
+
 			for (int i = 0; i < list.size(); i++) {
 				if (list.get(i) instanceof String)
 					findAddByVDMMatrix(vdmMatrix.get(i), list.get(i));
@@ -172,15 +194,25 @@ public class NearestNeighbor extends ANearestNeighbor {
 		}
 	}
 
-	private void findAddByVDMMatrix(List<Map<Object, Double>> vdmMatrixAttr,
-			Object o) {
-		for (int i = 0; i < vdmMatrixAttr.size(); i++) {
-			if (vdmMatrixAttr.get(i) != null){
-				if (vdmMatrixAttr.get(i).containsKey(o)) 
-					vdmMatrixAttr.get(i).
-			}				
-			else 
+	private void checkClass(Object o) {
+
+		if (!this.vdm.containsKey(o)) {
+			List<Map<Object, Double>> vdmMatrix = new LinkedList<Map<Object, Double>>();
+			for (int i = 0; i < traindata.get(0).size(); i++) {
+				vdmMatrix.add(new HashMap<Object, Double>());
+			}
+			this.vdm.put(o, vdmMatrix);
 		}
+
+	}
+
+	private void findAddByVDMMatrix(Map<Object, Double> vdmMatrixAttr, Object o) {
+
+		if (vdmMatrixAttr.containsKey(o))
+			vdmMatrixAttr.put(o, vdmMatrixAttr.get(o) + 1);
+		else
+			vdmMatrixAttr.put(o, 1.0);
+
 	}
 
 	@Override
@@ -190,12 +222,10 @@ public class NearestNeighbor extends ANearestNeighbor {
 
 		for (int i = 0; i < instance1.size() - 1; i++) {
 
-			if (instance1.get(i) instanceof Double
-					&& instance2.get(i) instanceof Double)
-				result += Math.abs((double) instance1.get(i)
-						- (double) instance2.get(i));
-			else if (instance1.get(i) instanceof String
-					&& instance2.get(i) instanceof String) {
+			if (getInstanceof(instance1.get(i), instance2.get(i)) == 0)
+				result += Math.abs(normalized((double) instance1.get(i), i)
+						- normalized((double) instance2.get(i), i));
+			else if (getInstanceof(instance1.get(i), instance2.get(i)) == 1) {
 
 				result += ((String) instance2.get(i)).equals((String) instance1
 						.get(i)) ? 0 : 1;
@@ -207,6 +237,23 @@ public class NearestNeighbor extends ANearestNeighbor {
 		return result;
 	}
 
+	private double normalized(double d, int i) {
+		if (this.translation[i] != 1 && this.scaling[i] != 1)
+			return (d - this.translation[i])
+					/ (this.scaling[i] - this.translation[i]);
+		return d;
+	}
+
+	private int getInstanceof(Object o1, Object o2) {
+		if (o1 instanceof Double && o2 instanceof Double)
+			return 0;
+		else if (o1 instanceof String && o2 instanceof String)
+
+			return 1;
+		else
+			return -1;
+	}
+
 	@Override
 	protected double determineEuclideanDistance(List<Object> instance1,
 			List<Object> instance2) {
@@ -214,18 +261,16 @@ public class NearestNeighbor extends ANearestNeighbor {
 		double result = 0;
 
 		for (int i = 0; i < instance1.size(); i++) {
-
 			if (instance1.get(i) instanceof Double
 					&& instance2.get(i) instanceof Double) {
-				result += Math.pow((double) instance1.get(i)
-						- (double) instance2.get(i), 2);
+				result += Math.pow(normalized((double) instance1.get(i), i)
+						- normalized((double) instance2.get(i), i), 2);
 
 			} else if (instance1.get(i) instanceof String
 					&& instance2.get(i) instanceof String) {
-				// result += ((String) instance2.get(i)).equals((String)
-				// instance1
-				// .get(i)) ? 0 : 1;
-				result += 0;
+				result += ((String) instance2.get(i)).equals((String) instance1
+						.get(i)) ? 0 : 1;
+
 			} else
 				return 0;
 
@@ -235,9 +280,46 @@ public class NearestNeighbor extends ANearestNeighbor {
 
 	@Override
 	protected double[][] normalizationScaling() {
-		// TODO Auto-generated method stub
 
-		return null;
+		double[][] result = new double[2][traindata.get(0).size()];
+
+		for (int i = 0; i < traindata.size(); i++) {
+			for (int j = 0; j < traindata.get(i).size(); j++) {
+
+				if (traindata.get(i).get(j) instanceof Double) {
+					if (isNormalizing())
+						if (i == 0 || j == 0) {
+							result[0][j] = (double) traindata.get(i).get(j);
+							result[1][j] = (double) traindata.get(i).get(j);
+						} else {
+
+							result[0][j] = Math.min((double) traindata.get(i)
+									.get(j), result[0][j - 1]);
+							result[1][j] = Math.max((double) traindata.get(i)
+									.get(j), result[1][j - 1]);
+						}
+					else {
+						result[0][j] = 1;
+						result[1][j] = 1;
+					}
+
+				} else {
+					result[0][j] = 1;
+					result[1][j] = 1;
+				}
+			}
+		}
+		return calScaling(result);
+	}
+
+	private double[][] calScaling(double[][] result) {
+		for (int j = 0; j < result[1].length; j++) {
+			if (result[0][j] != result[1][j])
+				result[1][j] -= result[0][j];
+		}
+
+		return result;
+
 	}
 
 	@Override
