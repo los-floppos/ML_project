@@ -29,11 +29,11 @@ public class NearestNeighbor extends ANearestNeighbor {
 	protected double[] scaling;
 	protected double[] translation;
 	private List<List<Object>> traindata;
+	private List<Object> testdata;
 	private Map<Object, List<Map<Object, Double>>> vdm = new HashMap<Object, List<Map<Object, Double>>>();
 
 	@Override
 	protected Object vote(List<Pair<List<Object>, Double>> subset) {
-		System.out.println(subset.size());
 		return getWinner(isInverseWeighting() ? getWeightedVotes(subset)
 				: getUnweightedVotes(subset));
 
@@ -120,7 +120,7 @@ public class NearestNeighbor extends ANearestNeighbor {
 	@Override
 	protected List<Pair<List<Object>, Double>> getNearest(List<Object> testdata) {
 		List<Pair<List<Object>, Double>> pairs = new ArrayList<Pair<List<Object>, Double>>();
-
+		this.testdata = testdata;
 		double[][] scalTran = normalizationScaling();
 		this.scaling = scalTran[1];
 		this.translation = scalTran[0];
@@ -238,9 +238,13 @@ public class NearestNeighbor extends ANearestNeighbor {
 	}
 
 	private double normalized(double d, int i) {
-		if (this.translation[i] != 1 && this.scaling[i] != 1)
-			return (d - this.translation[i])
-					/ (this.scaling[i] - this.translation[i]);
+
+		if (this.translation[i] != 0 && this.scaling[i] != 0)
+			if (this.translation[i] != 1 && this.scaling[i] != 1)
+				if (this.translation[i] == 1 && this.scaling[i] != 0)
+					return (d - this.translation[i])
+							/ (this.scaling[i] );
+
 		return d;
 	}
 
@@ -261,13 +265,11 @@ public class NearestNeighbor extends ANearestNeighbor {
 		double result = 0;
 
 		for (int i = 0; i < instance1.size(); i++) {
-			if (instance1.get(i) instanceof Double
-					&& instance2.get(i) instanceof Double) {
+			if (getInstanceof(instance1.get(i), instance2.get(i)) == 0) {
 				result += Math.pow(normalized((double) instance1.get(i), i)
 						- normalized((double) instance2.get(i), i), 2);
 
-			} else if (instance1.get(i) instanceof String
-					&& instance2.get(i) instanceof String) {
+			} else if (getInstanceof(instance1.get(i), instance2.get(i)) == 1) {
 				result += ((String) instance2.get(i)).equals((String) instance1
 						.get(i)) ? 0 : 1;
 
@@ -283,22 +285,28 @@ public class NearestNeighbor extends ANearestNeighbor {
 
 		double[][] result = new double[2][traindata.get(0).size()];
 
+		for (int i = 0; i < testdata.size(); i++) {
+			if (testdata.get(i) instanceof Double) {
+				if (isNormalizing()) {
+					result[0][i] = (double) testdata.get(i);
+					result[1][i] = (double) testdata.get(i);
+				} else {
+					result[0][i] = 1;
+					result[1][i] = 1;
+				}
+			}
+		}
 		for (int i = 0; i < traindata.size(); i++) {
 			for (int j = 0; j < traindata.get(i).size(); j++) {
 
 				if (traindata.get(i).get(j) instanceof Double) {
-					if (isNormalizing())
-						if (i == 0 || j == 0) {
-							result[0][j] = (double) traindata.get(i).get(j);
-							result[1][j] = (double) traindata.get(i).get(j);
-						} else {
+					if (isNormalizing()) {
 
-							result[0][j] = Math.min((double) traindata.get(i)
-									.get(j), result[0][j - 1]);
-							result[1][j] = Math.max((double) traindata.get(i)
-									.get(j), result[1][j - 1]);
-						}
-					else {
+						result[0][j] = Math.min((double) traindata.get(i)
+								.get(j), result[0][j]);
+						result[1][j] = Math.max((double) traindata.get(i)
+								.get(j), result[1][j]);
+					} else {
 						result[0][j] = 1;
 						result[1][j] = 1;
 					}
@@ -314,6 +322,7 @@ public class NearestNeighbor extends ANearestNeighbor {
 
 	private double[][] calScaling(double[][] result) {
 		for (int j = 0; j < result[1].length; j++) {
+
 			if (result[0][j] != result[1][j])
 				result[1][j] -= result[0][j];
 		}
