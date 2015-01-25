@@ -30,7 +30,9 @@ public class NearestNeighbor extends ANearestNeighbor {
 	protected double[] translation;
 	private List<List<Object>> traindata;
 	private List<Object> testdata;
-	private Map<Object, List<Map<Object, Double>>> vdm = new HashMap<Object, List<Map<Object, Double>>>();
+
+	// private Map<Object, List<Map<Object, Double>>> vdm = new HashMap<Object,
+	// List<Map<Object, Double>>>();
 
 	@Override
 	protected Object vote(List<Pair<List<Object>, Double>> subset) {
@@ -75,8 +77,7 @@ public class NearestNeighbor extends ANearestNeighbor {
 		Map<Object, Double> map = new HashMap<Object, Double>();
 		double funcResult = 0;
 		for (int i = 0; i < subset.size(); i++) {
-			Object classAtt = subset.get(i).getA()
-					.get(subset.get(i).getA().size() - 1);
+			Object classAtt = subset.get(i).getA().get(getClassAttribute());
 			if (map.containsKey(classAtt)) {
 
 				switch (func) {
@@ -121,9 +122,13 @@ public class NearestNeighbor extends ANearestNeighbor {
 	protected List<Pair<List<Object>, Double>> getNearest(List<Object> testdata) {
 		List<Pair<List<Object>, Double>> pairs = new ArrayList<Pair<List<Object>, Double>>();
 		this.testdata = testdata;
-		double[][] scalTran = normalizationScaling();
-		this.scaling = scalTran[1];
-		this.translation = scalTran[0];
+		if (isNormalizing()) {
+
+			double[][] scalTran = normalizationScaling();
+			this.scaling = scalTran[1];
+			this.translation = scalTran[0];
+			this.traindata.add(testdata);
+		}
 
 		for (int i = 0; i < traindata.size(); i++)
 			pairs.add(new Pair<List<Object>, Double>(traindata.get(i),
@@ -154,66 +159,68 @@ public class NearestNeighbor extends ANearestNeighbor {
 		return result;
 	}
 
-	private double[] calDifVDM_N(Object o1, Object o2, int attrIndex) {
-		double[] n = { 0, 0 };
-		HashMap<Object, Double> w;
-		for (Object o : vdm.keySet()) {
-			w = (HashMap<Object, Double>) this.vdm.get(o).get(attrIndex);
+	// private double[] calDifVDM_N(Object o1, Object o2, int attrIndex) {
+	// double[] n = { 0, 0 };
+	// HashMap<Object, Double> w;
+	// for (Object o : vdm.keySet()) {
+	// w = (HashMap<Object, Double>) this.vdm.get(o).get(attrIndex);
+	//
+	// n[0] += w.containsKey(o1) ? w.get(o1) : 0;
+	// n[1] += w.containsKey(o2) ? w.get(o2) : 0;
+	// }
+	// return n;
+	// }
 
-			n[0] += w.containsKey(o1) ? w.get(o1) : 0;
-			n[1] += w.containsKey(o2) ? w.get(o2) : 0;
-		}
-		return n;
-	}
+	// private double vdmFunc(Object o1, Object o2, int attrIndex) {
+	// double[] n = calDifVDM_N(o1, o2, attrIndex);
+	// double sum = 0;
+	// HashMap<Object, Double> w;
+	// for (Object o : vdm.keySet()) {
+	// w = (HashMap<Object, Double>) this.vdm.get(o).get(attrIndex);
+	// sum += Math.pow(
+	// Math.abs(((w.containsKey(o1) ? w.get(o1) : 0) / n[0])
+	// - ((w.containsKey(o2) ? w.get(o2) : 0) / n[1])),
+	// getkNearest());
+	// }
+	// return sum;
+	// }
 
-	private double vdmFunc(Object o1, Object o2, int attrIndex) {
-		double[] n = calDifVDM_N(o1, o2, attrIndex);
-		double sum = 0;
-		HashMap<Object, Double> w;
-		for (Object o : vdm.keySet()) {
-			w = (HashMap<Object, Double>) this.vdm.get(o).get(attrIndex);
-			sum += Math.pow(
-					Math.abs(((w.containsKey(o1) ? w.get(o1) : 0) / n[0])
-							- ((w.containsKey(o2) ? w.get(o2) : 0) / n[1])),
-					getkNearest());
-		}
-		return sum;
-	}
+	// private void VDM() {
+	//
+	// for (List<Object> list : traindata) {
+	// Object o = list.get(list.size() - 1);
+	// checkClass(o);
+	// List<Map<Object, Double>> vdmMatrix = this.vdm.get(o);
+	//
+	// for (int i = 0; i < list.size(); i++) {
+	// if (list.get(i) instanceof String)
+	// findAddByVDMMatrix(vdmMatrix.get(i), list.get(i));
+	// }
+	// }
+	// }
 
-	private void VDM() {
+	// private void checkClass(Object o) {
+	//
+	// if (!this.vdm.containsKey(o)) {
+	// List<Map<Object, Double>> vdmMatrix = new LinkedList<Map<Object,
+	// Double>>();
+	// for (int i = 0; i < traindata.get(0).size(); i++) {
+	// vdmMatrix.add(new HashMap<Object, Double>());
+	// }
+	// this.vdm.put(o, vdmMatrix);
+	// }
+	//
+	// }
 
-		for (List<Object> list : traindata) {
-			Object o = list.get(list.size() - 1);
-			checkClass(o);
-			List<Map<Object, Double>> vdmMatrix = this.vdm.get(o);
-
-			for (int i = 0; i < list.size(); i++) {
-				if (list.get(i) instanceof String)
-					findAddByVDMMatrix(vdmMatrix.get(i), list.get(i));
-			}
-		}
-	}
-
-	private void checkClass(Object o) {
-
-		if (!this.vdm.containsKey(o)) {
-			List<Map<Object, Double>> vdmMatrix = new LinkedList<Map<Object, Double>>();
-			for (int i = 0; i < traindata.get(0).size(); i++) {
-				vdmMatrix.add(new HashMap<Object, Double>());
-			}
-			this.vdm.put(o, vdmMatrix);
-		}
-
-	}
-
-	private void findAddByVDMMatrix(Map<Object, Double> vdmMatrixAttr, Object o) {
-
-		if (vdmMatrixAttr.containsKey(o))
-			vdmMatrixAttr.put(o, vdmMatrixAttr.get(o) + 1);
-		else
-			vdmMatrixAttr.put(o, 1.0);
-
-	}
+	// private void findAddByVDMMatrix(Map<Object, Double> vdmMatrixAttr, Object
+	// o) {
+	//
+	// if (vdmMatrixAttr.containsKey(o))
+	// vdmMatrixAttr.put(o, vdmMatrixAttr.get(o) + 1);
+	// else
+	// vdmMatrixAttr.put(o, 1.0);
+	//
+	// }
 
 	@Override
 	protected double determineManhattanDistance(List<Object> instance1,
@@ -238,12 +245,11 @@ public class NearestNeighbor extends ANearestNeighbor {
 	}
 
 	private double normalized(double d, int i) {
-
-		if (this.translation[i] != 0 && this.scaling[i] != 0)
-			if (this.translation[i] != 1 && this.scaling[i] != 1)
-				if (this.translation[i] == 1 && this.scaling[i] != 0)
-					return (d - this.translation[i])
-							/ (this.scaling[i] );
+		if (isNormalizing())
+			if (this.translation[i] != 0 && this.scaling[i] != 0)
+				if (this.translation[i] != 1 && this.scaling[i] != 1)
+					if (this.translation[i] == 1 && this.scaling[i] != 0)
+						return (d - this.translation[i]) / (this.scaling[i]);
 
 		return d;
 	}
