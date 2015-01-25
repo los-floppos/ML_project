@@ -76,24 +76,35 @@ public class NearestNeighbor extends ANearestNeighbor {
 			List<Pair<List<Object>, Double>> subset, int func) {
 		Map<Object, Double> map = new HashMap<Object, Double>();
 		double funcResult = 0;
-		for (int i = 0; i < subset.size(); i++) {
-			Object classAtt = subset.get(i).getA().get(getClassAttribute());
-			if (map.containsKey(classAtt)) {
+		Map<Object, Double> countClasses = new HashMap<Object, Double>();
 
-				switch (func) {
-				case 1: // inverseDistanceWeighting
-					funcResult = 1.0 / Math.pow(subset.get(i).getB(), 2);
-					break;
-				default: // UnweightedVotes
-					funcResult = subset.get(i).getB();
-					break;
-				}
+		for (int i = 0; i < subset.size(); i++) {
+			System.out.println(getClassAttribute());
+			Object classAtt = subset.get(i).getA().get(getClassAttribute());
+			switch (func) {
+			case 1: // inverseDistanceWeighting
+				funcResult = 1.0 / Math.pow(subset.get(i).getB(), 2);
+				break;
+			default: // UnweightedVotes
+				funcResult = subset.get(i).getB();
+
+				break;
+			}
+
+			if (map.containsKey(classAtt)) {
+				countClasses.put(classAtt, countClasses.get(classAtt) + 1);
 				map.put(classAtt, map.get(classAtt) + funcResult);
-			} else
-				map.put(classAtt, subset.get(i).getB());
+			} else {
+				map.put(classAtt, funcResult);
+				countClasses.put(classAtt, 1.0);
+			}
 
 		}
+		if (func == 0)
 
+			for (Object o : countClasses.keySet()) {
+				map.put(o, map.get(o) / countClasses.get(o));
+			}
 		return map;
 	}
 
@@ -240,17 +251,21 @@ public class NearestNeighbor extends ANearestNeighbor {
 			} else
 				return 0;
 		}
-
 		return result;
 	}
 
 	private double normalized(double d, int i) {
-		if (isNormalizing())
+		// System.out.println(isNormalizing());
+		// System.out.println( d +"+++++"+ this.translation[i] +"+++++"+
+		// this.scaling[i]);
+		// System.out.println( d );
+		if (isNormalizing()) {
 			if (this.translation[i] != 0 && this.scaling[i] != 0)
 				if (this.translation[i] != 1 && this.scaling[i] != 1)
-					if (this.translation[i] == 1 && this.scaling[i] != 0)
+					if (this.translation[i] >= 1 && this.scaling[i] != 0)
 						return (d - this.translation[i]) / (this.scaling[i]);
 
+		}
 		return d;
 	}
 
@@ -267,23 +282,30 @@ public class NearestNeighbor extends ANearestNeighbor {
 	@Override
 	protected double determineEuclideanDistance(List<Object> instance1,
 			List<Object> instance2) {
-
-		double result = 0;
-
+		double result1 = 0;
+		double result2 = 0;
+		double count = 0;
 		for (int i = 0; i < instance1.size(); i++) {
+//			System.out.println("getInstanceof::"
+//					+ getInstanceof(instance1.get(i), instance2.get(i)));
 			if (getInstanceof(instance1.get(i), instance2.get(i)) == 0) {
-				result += Math.pow(normalized((double) instance1.get(i), i)
+				result1 += Math.pow(normalized((double) instance1.get(i), i)
 						- normalized((double) instance2.get(i), i), 2);
-
+				count++;
 			} else if (getInstanceof(instance1.get(i), instance2.get(i)) == 1) {
-				result += ((String) instance2.get(i)).equals((String) instance1
-						.get(i)) ? 0 : 1;
+				result2 += ((String) instance2.get(i))
+						.equals((String) instance1.get(i)) ? 0 : 1;
 
+//				System.out.println(((String) instance2.get(i))
+//						.equals((String) instance1.get(i)) ? 0 : 1);
 			} else
 				return 0;
 
 		}
-		return Math.sqrt(result);
+		System.out.println(result1 +"++++" + result2 );
+		if (count != 0)
+			result1 /= count;
+		return Math.sqrt(result1 + result2);
 	}
 
 	@Override
@@ -312,9 +334,6 @@ public class NearestNeighbor extends ANearestNeighbor {
 								.get(j), result[0][j]);
 						result[1][j] = Math.max((double) traindata.get(i)
 								.get(j), result[1][j]);
-					} else {
-						result[0][j] = 1;
-						result[1][j] = 1;
 					}
 
 				} else {
